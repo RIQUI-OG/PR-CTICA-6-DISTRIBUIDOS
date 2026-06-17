@@ -15,7 +15,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar el código del servidor modificado para Docker
-COPY chat_servidor_v2.py ./chat_servidor.py
+COPY chat_servidor.py ./chat_servidor.py
 
 # Exponer el puerto de la API de Flask
 EXPOSE 9000
