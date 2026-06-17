@@ -249,26 +249,31 @@ def dibujar_panel():
 
 def main():
     hilo_flask = threading.Thread(
-        target=lambda: app.run(host=HOST, port=PORT,
-                               debug=False, use_reloader=False),
+        target=lambda: app.run(host=HOST, port=PORT, debug=False, use_reloader=False),
         daemon=True
     )
     hilo_flask.start()
-    print(f"[CHAT-SERVIDOR] Escuchando en http://{HOST}:{PORT}")
-    print("[CHAT-SERVIDOR] ESC para apagar.")
+    print(f"[CHAT-SERVIDOR] API REST escuchando en http://{HOST}:{PORT}")
+    print("[CHAT-SERVIDOR] Corriendo de forma Headless.")
 
     try:
         while True:
             panel = dibujar_panel()
-            cv2.imshow("Chat Distribuido  [Servicio Web REST]", panel)
-            if cv2.waitKey(300) & 0xFF == 27:
-                break
+            try:
+                # Intentamos dibujar la interfaz
+                cv2.imshow("Chat Distribuido", panel)
+                if cv2.waitKey(300) & 0xFF == 27:
+                    break
+            except Exception:
+                # Si falla por no tener pantalla, mantenemos viva la app e imprimimos logs
+                print(f"[LOG] Usuarios activos: {list(_usuarios.keys())} | Mensajes Totales: {_contador}", flush=True)
+                time.sleep(5)
     except KeyboardInterrupt:
         pass
     finally:
-        cv2.destroyAllWindows()
+        try:
+            # Intentamos limpiar las ventanas al salir
+            cv2.destroyAllWindows()
+        except Exception:
+            pass
         print("[CHAT-SERVIDOR] Apagado.")
-
-
-if __name__ == '__main__':
-    main()
