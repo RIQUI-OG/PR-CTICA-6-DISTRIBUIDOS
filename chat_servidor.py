@@ -21,15 +21,18 @@
 #
 # ─────────────────────────────────────────────────────────────────────────────
 from flask import Flask, request, jsonify
-from flask_cors import CORS # <--- AÑADE ESTO
+from flask_cors import CORS
 import threading
 import time
 import cv2
 import numpy as np
+import sys
+import os # <--- ¡Añade esto!
 
-# ── Configuración ─────────────────────────────────────────────────────────
-HOST = 'localhost'
-PORT = 9000
+# ── Configuración ─────────────────────────────────────────────────────────────
+HOST = '0.0.0.0'
+# Cloud Run inyecta la variable de entorno PORT. Si no existe, usamos 9000 por defecto.
+PORT = int(os.environ.get('PORT', 9000))
 
 app = Flask(__name__)
 CORS(app) # <--- AÑADE ESTO (Permite que el navegador confíe en las peticiones)
