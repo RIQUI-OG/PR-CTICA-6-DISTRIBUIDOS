@@ -30,7 +30,7 @@ import queue
 # ── Configuración ─────────────────────────────────────────────────────────────
 HOST = 'localhost'
 PORT = 9000
-URL  = f"http://{HOST}:{PORT}"
+URL = "https://chat-servidor-313565485349.us-central1.run.app"
 
 POLL_INTERVAL      = 1.0   # segundos entre GETs de mensajes nuevos
 HEARTBEAT_INTERVAL = 5.0   # segundos entre heartbeats
