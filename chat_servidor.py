@@ -21,16 +21,18 @@
 #
 # ─────────────────────────────────────────────────────────────────────────────
 from flask import Flask, request, jsonify
+from flask_cors import CORS # <--- AÑADE ESTO
 import threading
 import time
 import cv2
 import numpy as np
 
-# ── Configuración ─────────────────────────────────────────────────────────────
+# ── Configuración ─────────────────────────────────────────────────────────
 HOST = 'localhost'
 PORT = 9000
 
 app = Flask(__name__)
+CORS(app) # <--- AÑADE ESTO (Permite que el navegador confíe en las peticiones)
 
 # ── Estado del chat ───────────────────────────────────────────────────────────
 _lock       = threading.Lock()

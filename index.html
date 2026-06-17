@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat REST</title>
+    <style>
+        /* ─── Paleta de colores basada en el cliente Tkinter ─── */
+        :root {
+            --bg-main: #1a1a2e;
+            --bg-header: #16213e;
+            --bg-panel: #0d1117;
+            --bg-input: #21262d;
+            --text-main: #c9d1d9;
+            --text-system: #555577;
+            --text-own: #79c0ff;
+            --text-other: #56d364;
+            --text-time: #444466;
+            --accent-cyan: #00d4ff;
+            --accent-green: #00ff88;
+            --btn-bg: #238636;
+            --btn-hover: #2ea043;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Consolas', monospace; background-color: var(--bg-main); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; }
+        
+        /* ─── Pantalla de Login ─── */
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        #login-box { background: var(--bg-header); padding: 30px; border-radius: 8px; text-align: center; border: 1px solid var(--bg-input); }
+        #login-box h2 { color: var(--accent-cyan); margin-bottom: 20px; font-size: 1.2rem; }
+        #login-box input { padding: 10px; width: 80%; background: var(--bg-input); border: none; color: white; margin-bottom: 15px; font-family: 'Consolas', monospace; }
+        #login-box button { padding: 10px 20px; background: var(--btn-bg); color: white; border: none; cursor: pointer; font-weight: bold; }
+        
+        /* ─── Interfaz Principal ─── */
+        #app { display: none; flex-direction: column; height: 100%; }
+        header { background-color: var(--bg-header); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--bg-input); }
+        header h1 { font-size: 1.1rem; color: var(--accent-cyan); font-weight: bold; }
+        #lbl-usuario { color: var(--accent-green); font-size: 0.9rem; }
+
+        #main-container { display: flex; flex: 1; overflow: hidden; padding: 10px; gap: 10px; }
+        
+        .panel-title { font-size: 0.8rem; color: var(--text-system); margin-bottom: 5px; font-weight: bold; }
+        
+        #mensajes-wrapper { flex: 1; display: flex; flex-direction: column; }
+        #caja-mensajes { flex: 1; background-color: var(--bg-panel); padding: 10px; overflow-y: auto; border-radius: 4px; white-space: pre-wrap; }
+        
+        #usuarios-wrapper { width: 200px; display: flex; flex-direction: column; }
+        #caja-usuarios { flex: 1; background-color: var(--bg-panel); padding: 10px; overflow-y: auto; border-radius: 4px; color: var(--accent-green); list-style: none;}
+        #caja-usuarios li { margin-bottom: 5px; }
+
+        #http-wrapper { padding: 0 10px; }
+        #caja-http { height: 80px; background-color: var(--bg-panel); padding: 10px; overflow-y: auto; color: #6e7681; font-size: 0.8rem; border-radius: 4px; white-space: pre-wrap; }
+
+        #input-container { background-color: var(--bg-input); padding: 15px; display: flex; gap: 10px; margin-top: 10px; }
+        #input-mensaje { flex: 1; background-color: var(--bg-main); border: 1px solid #30363d; color: white; padding: 10px; font-family: 'Consolas', monospace; border-radius: 4px; outline: none;}
+        #btn-enviar { background-color: var(--btn-bg); color: white; border: none; padding: 0 20px; font-weight: bold; cursor: pointer; border-radius: 4px; }
+        #btn-enviar:hover { background-color: var(--btn-hover); }
+
+        /* ─── Clases de texto para mensajes ─── */
+        .msg-sistema { color: var(--text-system); }
+        .msg-propio { color: var(--text-own); }
+        .msg-otro { color: var(--text-other); }
+        .msg-hora { color: var(--text-time); }
+    </style>
+</head>
+<body>
+
+    <div id="login-overlay">
+        <div id="login-box">
+            <h2>💬 CHAT DISTRIBUIDO REST</h2>
+            <input type="text" id="input-username" placeholder="Tu nombre de usuario..." autofocus>
+            <br>
+            <button onclick="iniciarSesion()">Unirse al Chat</button>
+        </div>
+    </div>
+
+    <div id="app">
+        <header>
+            <h1>💬 CHAT DISTRIBUIDO — REST API</h1>
+            <span id="lbl-usuario"></span>
+        </header>
+
+        <div id="main-container">
+            <div id="mensajes-wrapper">
+                <div class="panel-title">MENSAJES</div>
+                <div id="caja-mensajes"></div>
+            </div>
+            <div id="usuarios-wrapper">
+                <div class="panel-title" style="color: var(--accent-cyan);">CONECTADOS</div>
+                <ul id="caja-usuarios"></ul>
+            </div>
+        </div>
+
+        <div id="http-wrapper">
+            <div class="panel-title">PETICIONES HTTP</div>
+            <div id="caja-http"></div>
+        </div>
+
+        <div id="input-container">
+            <input type="text" id="input-mensaje" placeholder="Escribe un mensaje...">
+            <button id="btn-enviar" onclick="enviarMensaje()">Enviar</button>
+        </div>
+    </div>
+
+    <script>
+        const URL_API = 'http://localhost:9000';
+        let usuarioActual = '';
+        let ultimoId = 0;
+        let logLines = [];
+
+        // ─── Funciones Core de la API ────────────────────────────────────────
+
+        async function fetchAPI(endpoint, method = 'GET', body = null) {
+            const options = { method, headers: {} };
+            if (body) {
+                options.headers['Content-Type'] = 'application/json';
+                options.body = JSON.stringify(body);
+            }
+            try {
+                const response = await fetch(`${URL_API}${endpoint}`, options);
+                const data = await response.json();
+                return { ok: response.ok, data };
+            } catch (error) {
+                return { ok: false, error };
+            }
+        }
+
+        async function iniciarSesion() {
+            const input = document.getElementById('input-username').value.trim();
+            if (!input) return;
+
+            const res = await fetchAPI('/unirse', 'POST', { usuario: input });
+            
+            if (res.ok) {
+                usuarioActual = input;
+                document.getElementById('lbl-usuario').innerText = `● ${usuarioActual}`;
+                document.getElementById('login-overlay').style.display = 'none';
+                document.getElementById('app').style.display = 'flex';
+                
+                // Event Listener para "Enter" en el input
+                document.getElementById('input-mensaje').addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') enviarMensaje();
+                });
+
+                iniciarHilos();
+                window.addEventListener('beforeunload', salirDelChat);
+            } else {
+                alert('Error al conectar. ¿El servidor está corriendo?');
+            }
+        }
+
+        async function salirDelChat() {
+            await fetchAPI('/salir', 'DELETE', { usuario: usuarioActual });
+        }
+
+        async function enviarMensaje() {
+            const inputElement = document.getElementById('input-mensaje');
+            const texto = inputElement.value.trim();
+            if (!texto) return;
+
+            inputElement.value = ''; // Limpiar input
+            const res = await fetchAPI('/mensajes', 'POST', { usuario: usuarioActual, texto: texto });
+            logHTTP(`POST /mensajes  →  ${res.ok ? '200 OK' : 'ERROR'}`);
+        }
+
+        // ─── Hilos de Background (Polling y Heartbeat) ───────────────────────
+
+        function iniciarHilos() {
+            // Polling: cada 1 segundo (como en Tkinter)
+            setInterval(async () => {
+                const res = await fetchAPI(`/mensajes?desde=${ultimoId}`, 'GET');
+                if (res.ok && res.data.mensajes && res.data.mensajes.length > 0) {
+                    res.data.mensajes.forEach(mostrarMensaje);
+                    ultimoId = res.data.mensajes[res.data.mensajes.length - 1].id;
+                    logHTTP(`GET  /mensajes?desde=${ultimoId - res.data.mensajes.length}  →  ${res.data.mensajes.length} nuevo(s)`);
+                }
+            }, 1000);
+
+            // Usuarios: refrescar cada 3 segundos
+            setInterval(async () => {
+                const res = await fetchAPI('/usuarios', 'GET');
+                if (res.ok && res.data.usuarios) {
+                    actualizarUsuarios(res.data.usuarios);
+                }
+            }, 3000);
+
+            // Heartbeat: cada 5 segundos
+            setInterval(async () => {
+                await fetchAPI('/heartbeat', 'POST', { usuario: usuarioActual });
+                logHTTP(`POST /heartbeat  →  ${usuarioActual} activo`);
+            }, 5000);
+        }
+
+        // ─── UI Helpers ──────────────────────────────────────────────────────
+
+        function mostrarMensaje(msg) {
+            const caja = document.getElementById('caja-mensajes');
+            const linea = document.createElement('div');
+
+            if (msg.usuario === 'SISTEMA') {
+                linea.className = 'msg-sistema';
+                linea.innerText = `  ${msg.texto}`;
+            } else if (msg.usuario === usuarioActual) {
+                linea.innerHTML = `<span class="msg-hora">[${msg.timestamp}]</span> <span class="msg-propio">Tú: ${msg.texto}</span>`;
+            } else {
+                linea.innerHTML = `<span class="msg-hora">[${msg.timestamp}]</span> <span class="msg-otro">${msg.usuario}: ${msg.texto}</span>`;
+            }
+
+            caja.appendChild(linea);
+            caja.scrollTop = caja.scrollHeight; // Auto-scroll
+        }
+
+        function actualizarUsuarios(usuarios) {
+            const lista = document.getElementById('caja-usuarios');
+            lista.innerHTML = '';
+            usuarios.forEach(u => {
+                const li = document.createElement('li');
+                li.innerText = (u === usuarioActual ? '► ' : '  ') + u;
+                lista.appendChild(li);
+            });
+        }
+
+        function logHTTP(texto) {
+            const hora = new Date().toLocaleTimeString('es-ES', { hour12: false });
+            logLines.push(`${hora}  ${texto}`);
+            if (logLines.length > 6) logLines.shift(); // Mantener solo las últimas 6 líneas
+            
+            const cajaHttp = document.getElementById('caja-http');
+            cajaHttp.innerText = logLines.join('\n');
+            cajaHttp.scrollTop = cajaHttp.scrollHeight;
+        }
+    </script>
+</body>
+</html>
